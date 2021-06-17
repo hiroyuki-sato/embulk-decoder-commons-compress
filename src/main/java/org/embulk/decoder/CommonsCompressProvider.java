@@ -16,8 +16,8 @@ import org.apache.commons.compress.compressors.CompressorStreamFactory;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
 import org.embulk.decoder.CommonsCompressDecoderPlugin.PluginTask;
-import org.embulk.spi.util.FileInputInputStream;
-import org.embulk.spi.util.InputStreamFileInput.Provider;
+import org.embulk.util.file.FileInputInputStream;
+import org.embulk.util.file.InputStreamFileInput.Provider;
 
 class CommonsCompressProvider implements Provider {
     private static final String AUTO_DETECT_FORMAT = "";

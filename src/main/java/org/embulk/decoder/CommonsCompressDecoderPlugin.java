@@ -1,19 +1,30 @@
 package org.embulk.decoder;
 
-import org.embulk.config.Config;
-import org.embulk.config.ConfigDefault;
-import org.embulk.config.ConfigInject;
+import org.embulk.spi.Exec;
+import org.embulk.util.config.Config;
+import org.embulk.util.config.ConfigDefault;
 import org.embulk.config.ConfigSource;
-import org.embulk.config.Task;
+import org.embulk.util.config.ConfigMapper;
+import org.embulk.util.config.ConfigMapperFactory;
+import org.embulk.util.config.Task;
 import org.embulk.config.TaskSource;
 import org.embulk.spi.BufferAllocator;
 import org.embulk.spi.DecoderPlugin;
 import org.embulk.spi.FileInput;
-import org.embulk.spi.util.FileInputInputStream;
+import org.embulk.util.config.TaskMapper;
+import org.embulk.util.file.FileInputInputStream;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class CommonsCompressDecoderPlugin
         implements DecoderPlugin
 {
+    private static final ConfigMapperFactory CONFIG_MAPPER_FACTORY = ConfigMapperFactory
+            .builder()
+            .addDefaultModules()
+            .build();
+    private static final ConfigMapper CONFIG_MAPPER = CONFIG_MAPPER_FACTORY.createConfigMapper();
+
     public interface PluginTask
             extends Task
     {
@@ -29,23 +40,23 @@ public class CommonsCompressDecoderPlugin
         @ConfigDefault("\"\"")
         public String getMatchName();
 
-        @ConfigInject
-        public BufferAllocator getBufferAllocator();
     }
 
     @Override
     public void transaction(ConfigSource config, DecoderPlugin.Control control)
     {
-        PluginTask task = config.loadConfig(PluginTask.class);
+        final PluginTask task = CONFIG_MAPPER.map(config, PluginTask.class);
+
         control.run(task.dump());
     }
 
     @Override
     public FileInput open(TaskSource taskSource, FileInput input)
     {
-        PluginTask task = taskSource.loadTask(PluginTask.class);
+        final TaskMapper taskMapper = CONFIG_MAPPER_FACTORY.createTaskMapper();
+        final PluginTask task = taskMapper.map(taskSource, PluginTask.class);
         return new CommonsCompressFileInput(
-                task.getBufferAllocator(),
+                Exec.getBufferAllocator(),
                 new CommonsCompressProvider(task, new FileInputInputStream(input) {
                     // NOTE: This is workaround code to avoid hanging issue.
                     // This issue will be fixed after merging #112.
