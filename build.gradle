@@ -1,11 +1,12 @@
 plugins {
     id "com.jfrog.bintray" version "1.1"
-    id "com.github.jruby-gradle.base" version "0.1.5"
     id "java"
+    id "maven-publish"  // Note that "uploadArchives" with the "maven" plugin is no longer supported.
+    id "org.embulk.embulk-plugins" version "0.4.2"
 }
-import com.github.jrubygradle.JRubyExec
 
-apply from: 'https://raw.githubusercontent.com/hata/gradle-plugins/master/embulk-integration-test.gradle'
+//Comment for a time.
+//apply from: 'https://raw.githubusercontent.com/hata/gradle-plugins/master/embulk-integration-test.gradle'
 
 sourceCompatibility = '1.8'
 targetCompatibility = '1.8'
@@ -18,50 +19,61 @@ configurations {
     provided
 }
 
+group = "io.github.hata"
 version = "0.5.0"
+description = "Commons Compress decoder plugin is an Embulk plugin that decodes files using Apache Commons Compress library. It is read by any file input plugins. Search the file input plugins by 'embulk-input file' keywords."
 
 dependencies {
-    compile  "org.embulk:embulk-core:0.9.23"
+    compileOnly "org.embulk:embulk-api:0.10.31"
+    compileOnly "org.embulk:embulk-spi:0.10.31"
+    compile "org.embulk:embulk-util-config:0.3.0"
+
     compile "org.apache.commons:commons-compress:1.20"
-    provided "org.embulk:embulk-core:0.9.23"
+
+    testCompile "org.embulk:embulk-api:0.10.31"
+    testCompile "org.embulk:embulk-spi:0.10.31"
+    testCompile "org.embulk:embulk-core:0.10.31"
+    testCompile "org.embulk:embulk-deps:0.10.31"
+
     // compile "YOUR_JAR_DEPENDENCY_GROUP:YOUR_JAR_DEPENDENCY_MODULE:YOUR_JAR_DEPENDENCY_VERSION"
     testCompile "org.jmockit:jmockit:1.15"
     testCompile "junit:junit:4.+"
 }
 
-task classpath(type: Copy, dependsOn: ["jar"]) {
-    doFirst { file("classpath").deleteDir() }
-    from (configurations.runtime - configurations.provided + files(jar.archivePath))
-    into "classpath"
-}
-clean { delete 'classpath' }
-
-task gem(type: JRubyExec, dependsOn: ["build", "gemspec", "classpath"]) {
-    jrubyArgs "-rrubygems/gem_runner", "-eGem::GemRunner.new.run(ARGV)", "build"
-    script "build/gemspec"
-    doLast { ant.move(file: "${project.name}-${project.version}.gem", todir: "pkg") }
+embulkPlugin {
+    mainClass = "org.embulk.decoder.CommonsCompressDecoderPlugin"
+    category = "decoder"
+    type = "commons-compress"
 }
 
-task gemspec << { file("build/gemspec").write($/
-Gem::Specification.new do |spec|
-  spec.name          = "${project.name}"
-  spec.version       = "${project.version}"
-  spec.authors       = ["hata"]
-  spec.summary       = %[Commons Compress decoder plugin for Embulk]
-  spec.description   = %[Commons Compress decoder plugin is an Embulk plugin that decodes files using Apache Commons Compress library. It is read by any file input plugins. Search the file input plugins by 'embulk-input file' keywords.]
-  spec.email         = ["hiroki.ata@gmail.com"]
-  spec.licenses      = ["MIT"]
-  spec.homepage      = "https://github.com/hata/embulk-decoder-commons-compress"
-
-  spec.files         = `git ls-files`.split("\n") + Dir["classpath/*.jar"]
-  spec.test_files    = spec.files.grep(%r"^(test|spec)/")
-  spec.require_paths = ["lib"]
-
-  #spec.add_dependency 'YOUR_GEM_DEPENDENCY', ['~> YOUR_GEM_DEPENDENCY_VERSION']
-  spec.add_development_dependency 'bundler', ['~> 1.0']
-  spec.add_development_dependency 'rake', ['>= 10.0']
-end
-/$)
+publishing {
+    publications {
+        embulkPluginMaven(MavenPublication) {  // Publish it with "publishEmbulkPluginMavenPublicationToMavenRepository".
+            from components.java  // Must be "components.java". The dependency modification works only for it.
+        }
+    }
+    repositories {
+        maven {
+            url = "${project.buildDir}/mavenPublishLocal"
+        }
+    }
 }
 
-project.tasks.integrationTest.dependsOn(classpath)
+gem {
+    from("LICENSE.txt")  // Optional -- if you need other files in the gem.
+    authors = [ "hata" ]
+    email = [ "hiroki.ata@gmail.com" ]
+    // "description" of the gem is copied from "description" of your Gradle project.
+    summary = "Commons Compress decoder plugin for Embulk"
+    homepage = "https://github.com/hata/embulk-decoder-commons-compress"
+    licenses = [ "MIT" ]
+    //metadata = []  // Optional -- if you need metadata in the gem.
+}
+
+gemPush {
+    host = "https://rubygems.org"
+}
+
+
+//Comment for a time
+//project.tasks.integrationTest.dependsOn(classpath)
